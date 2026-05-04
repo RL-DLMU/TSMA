@@ -1,20 +1,20 @@
-# MADDPG
+# TSMA
 
-This is a pytorch implementation of MADDPG on [Multi-Agent Particle Environment(MPE)](https://github.com/openai/multiagent-particle-envs), the corresponding paper of MADDPG is [Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments](https://arxiv.org/abs/1706.02275).
+This is a pytorch implementation of TSMA on [Multi-Agent Particle Environment(MPE)](https://github.com/openai/multiagent-particle-envs), the corresponding paper of TSMA is [Guiding Team Objectives with Individual Policies: A Two-Stage Model Aggregation Framework for Partially Cooperative MARL].
 
 ## Requirements
 
-- python=3.6.5
+- python=3.7
 - [Multi-Agent Particle Environment(MPE)](https://github.com/openai/multiagent-particle-envs)
 - torch=1.1.0
 
 ## Quick Start
 
 ```shell
-$ python main.py --scenario-name=simple_tag --evaluate-episodes=10
+$ python main.py --scenario-name=simple_tag --evaluate-episodes=100
 ```
 
-Directly run the main.py, then the algrithm will be tested on scenario 'simple_tag' for 10 episodes, using the pretrained model.
+Directly run the main.py, then the algrithm will be tested on scenario 'simple_tag' for 100 episodes, using the pretrained model.
 
 ## Note
 
