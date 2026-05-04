@@ -4,7 +4,7 @@ This is a pytorch implementation of TSMA on [Multi-Agent Particle Environment(MP
 
 ## What Problem Does TSMA Solve?
 
-In Partially Cooperative Markov Games (PCMG), each agent receives both **individual rewards** and **team rewards** . This creates a fundamental tension:
+In Partially Cooperative Markov Games (PCMG), each agent receives both **individual rewards** and **team rewards** . However, discrepancies in reward functions create only partial alignment between individual and team objectives. Using only individual rewards can lead to incomplete cooperation, while using only team rewards faces the challenge of sparsity, which hinders credit assignment and exploration. To address these issues, existing approaches typically fall into two categories:
 
 | Approach | Limitation |
 |----------|-------------|
