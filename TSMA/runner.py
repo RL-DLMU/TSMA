@@ -8,7 +8,13 @@ import numpy as np
 import datetime
 from collections import deque
 import matplotlib.pyplot as plt
+from agents.MAPPO import MAPPOAgent_td
 from agents.IPPO import IPPOAgent_td
+from agents.DDPG import mulAgent_ddpg
+# from agents.HAPPO import HAPPOAgent_td
+from agents.IPPO_multia import IPPOmulaAgent_td
+# from agents.IPPO_multiac import IPPOmulaAgent_td
+# from agents.irat_row import iratrowAgent_td
 from agents.MAPPO_irat_multiactors_widv import irat_mulAgent_td_widv
 from agents.MADDPG_irat_multiactors_widv import irat_mulAgent_pg
 
@@ -23,6 +29,11 @@ class Runner:
         self.episode_limit = args.max_episode_len
         self.env = env
         self.buffer = Buffer(args)
+        # self.method = args.method
+        # if args.method == "IPPO":
+        #     from agents.IPPO import IPPOAgent_td
+        # if args.method == "MAPPO":
+        #     from agents.MAPPO import MAPPOAgent_td
         self.agents = self._init_agents()
         self.log_file = self.args.log_dir + '/' + args.method + '/' + self.args.scenario_name
 
@@ -41,14 +52,33 @@ class Runner:
         agents = []
         sub_agents = self.args.n_agents
         for i in range(int(self.args.n_agents / sub_agents)):
+            if self.args.method == "IPPO_i" or self.args.method == "IPPO_team" or self.args.method == "IPPO_RS": # IPPO maoppo rs
+                agents.append(IPPOAgent_td(i, self.args))
+            if self.args.method == "HAPPO":
+                agents.append(HAPPOAgent_td(i, self.args))
+            if self.args.method == "MAPPO":
+                agents.append(MAPPOAgent_td(i, self.args))
+            if self.args.method == "irat":
+                agents.append(iratAgent_td(i, self.args))
+            if self.args.method == "irat_row":
+                agents.append(iratrowAgent_td(i, self.args))
+            if self.args.method == "irat_multi":
+                agents.append(irat_mulAgent_td(i, self.args))
             if self.args.method == "irat_multi_widv": # tsma-mappo
                 agents.append(irat_mulAgent_td_widv(i, self.args))
             if self.args.method == "pgirat_multi_widv":  # tsma-maddpg
                 agents.append(irat_mulAgent_pg(i, self.args))
+            if self.args.method == "ddpg":  # mappdg
+                agents.append(mulAgent_ddpg(i, self.args))
+            if self.args.method == "irat_multi_widv_soft":
+                agents.append(irat_mulAgent_td_widv_soft(i, self.args))
+            if self.args.method == "irat_multi_soft":
+                agents.append(irat_mulAgent_td_soft(i, self.args))
         return agents
 
     def run(self):
         # print("MAPPO,团队奖励训练")
+        info_print = self.args.method + ', ' + self.args.scenario_name+ ',alpha0.01,1w'
         print(info_print)
         e = 0
         returns = []
@@ -66,6 +96,8 @@ class Runner:
                 cur_loss_a_sublist = []
                 last_observations = self.env.reset()
                 lacal_last_observations = last_observations
+                # if self.args.method[:12] == "pgirat_multi" or self.args.method == "ddpg":
+                #     self.replay_buffer = deque(maxlen=5000)
                 buffer_cur = []
                 return_i = 0
                 return_prey = 0
@@ -76,9 +108,16 @@ class Runner:
                     rnn_state = None
                 rnn_state_team = None
 
+            if e>2500:
+                aa =0
+            # self.env.render()
+            # if e ==2000:
+            #     aaa = 0
             actions = []
             with torch.no_grad():
                 for agent_id, agent in enumerate(self.agents):
+                    if self.args.method == "IPPO_i" or self.args.method == "IPPO_team" or self.args.method == "IPPO_multia" or self.args.method == "IPPO_RS" or self.args.method == "HAPPO":
+                        action, act_log_probs, rnn_state, w = agent.get_action(lacal_last_observations, rnn_state, test=False)
                     if self.args.method == "MAPPO":
                         action, act_log_probs, rnn_state, w = agent.get_action(last_observations, rnn_state, test=False)
                     if self.args.method[:4] == "irat":
@@ -99,6 +138,11 @@ class Runner:
                         action, action_soft, rnn_state, rnn_state_team = agent.get_action(last_observations, last_rnn_state, last_rnn_team_state, test=False)
                     actions.append(action)
 
+            # actions = []
+            # for i in range(8):
+            #     action = np.random.choice(list(range(5)))
+            #     actions.append(action)
+            # actions = [actions]
             observations, rewards, rewards_prey, rewards_team, done, info = self.env.step(np.array(actions).flatten())
             if len(set(rewards_team)) != 1:
                 aaa =0
@@ -113,9 +157,20 @@ class Runner:
             return_team += rewards_team[0]
             # return_i.append(rewards[0])
             # return_team.append(rewards_team[0])
+            if self.args.method == self.args.method == "IPPO_RS":
+                rewards = [a + b for a, b in zip(rewards, rewards_team)]
+            if self.args.method == "IPPO_i" or self.args.method == "IPPO_multia" or self.args.method == "IPPO_RS":
+                for idx, ag in enumerate(self.agents):
+                    buffer_cur.append((lacal_last_observations, actions[idx], actions[idx], rewards, local_observations, act_log_probs, w))
+            if self.args.method == "IPPO_team" or self.args.method == "HAPPO":
+                for idx, ag in enumerate(self.agents):
+                    buffer_cur.append((lacal_last_observations, actions[idx], actions[idx], rewards_team, local_observations, act_log_probs, w))
             if self.args.method == "MAPPO":
                 for idx, ag in enumerate(self.agents):
                     buffer_cur.append((last_observations, actions[idx], actions[idx], rewards_team, observations, act_log_probs, w))
+            if self.args.method[:4] == "irat":
+                for idx, ag in enumerate(self.agents):
+                    buffer_cur.append((lacal_last_observations, actions[idx], actions[idx], rewards, local_observations, act_log_probs, rewards_team, act_log_probs_team, last_observations, observations))
             if self.args.method[:4] == "pgir":
                 for idx, ag in enumerate(self.agents):
                     ag.replay_buffer.append((lacal_last_observations, rnn_state_team, action_soft, rewards, local_observations, last_rnn_state, rewards_team, last_rnn_team_state, last_observations, observations, rnn_state))
@@ -163,7 +218,27 @@ class Runner:
                     self.writeLog(self.args.method, e, returns_i, returns_prey, cur_loss_a_list, returns_team, drift_idv_list, drift_team_list, info_print)
                 if e % 50 == 0:
                     self.writeLog(self.args.method, e, returns_i, returns_prey, cur_loss_a_list, returns_team, drift_idv_list, drift_team_list)
+                if e==5000:
+                    aaa = 0
 
+        if True:
+            aaa = 0
+            # if self.buffer.current_size >= self.args.batch_size:
+            #     transitions = self.buffer.sample(self.args.batch_size)
+            #     for agent in self.agents:
+            #         other_agents = self.agents.copy()
+            #         other_agents.remove(agent)
+            #         agent.learn(transitions, other_agents)
+            # if time_step > 0 and time_step % self.args.evaluate_rate == 0:
+            #     returns.append(self.evaluate())
+            #     plt.figure()
+            #     plt.plot(range(len(returns)), returns)
+            #     plt.xlabel('episode * ' + str(self.args.evaluate_rate / self.episode_limit))
+            #     plt.ylabel('average returns')
+            #     plt.savefig(self.save_path + '/plt.png', format='png')
+            # self.noise = max(0.05, self.noise - 0.0000005)
+            # self.epsilon = max(0.05, self.epsilon - 0.0000005)
+            # np.save(self.save_path + '/returns.pkl', returns)
 
     def evaluate(self):
         returns = []
